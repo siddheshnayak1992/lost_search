@@ -594,7 +594,7 @@ localStorage.removeItem("footwear-searches-v1");
 location.reload();
 ```
 
-Use the console for the same origin as the app (`localhost` and `127.0.0.1` have separate storage). This removes only aggregated demo searches. It does not change the three JSON source files. Alternatively, in DevTools Application storage, delete only the `footwear-searches-v1` entry. Avoid `localStorage.clear()` if other local app data may be present.
+Use the console for the same origin as the app (`localhost` and `127.0.0.1` have separate storage). This resets saved changes to the three JSON seed files; on reload, the app initializes from those files and writes the seed state back to `footwear-searches-v1`. It does not leave storage empty or change the source files. Alternatively, in DevTools Application storage, delete only the `footwear-searches-v1` entry. Avoid `localStorage.clear()` if other local app data may be present.
 
 Run the examples in order. Select seeded rows from Zero Results for Modules 2-4; selecting a row opens Product Matches without changing its saved count or baseline result count.
 
@@ -605,10 +605,10 @@ Run the examples in order. Select seeded rows from Zero Results for Modules 2-4;
 | 3. Spelling | Open Zero Results and select `adiddas running shoes`. | Product Matches shows the Adidas candidate and a spelling-correction chip. Zero Results displays the canonicalized query. |
 | 4. Product scoring | Keep `adiddas running shoes` selected on Product Matches. | Product Matches ranks products with weighted score and field-level matched-term evidence; Adidas Runfalcon 3 is the top candidate in the seeded catalog. |
 | 5. Query grouping | Open Query Groups and find the Adidas running-shoe group. | `adiddas running shoes` and `adidas running shoes` normalize to the same terms. The representative is `adidas running shoes`; those two source phrases contribute 59 searches to the group total. |
-| 6. Gaps and recommendations | Open Vocabulary Gaps, then Recommendations. | Vocabulary Gaps shows `red party footwear` → missing term `red` → Bacca Bucci Light-Up Party Sneaker (score 35). Recommendations includes a metadata-review suggestion for that term. |
+| 6. Gaps and recommendations | On Overview, click **Run live gap example**. Open Vocabulary Gaps, then Recommendations. | The button submits the new query `blue party footwear` through the same search handler as the top search. Vocabulary Gaps adds `blue party footwear` → missing term `blue` → Bacca Bucci Light-Up Party Sneaker (score 35, search count 1). The seeded `red party footwear` row remains. Recommendations adds a metadata-review suggestion for `blue`. |
 | 7. Fix Simulator | Set Original query to `glow footwear`, Add this term to `party`, then run the simulation. | Fix Simulator shows zero lexical candidates before the expansion and the party sneaker among candidates after it. The simulation does not modify saved searches or source JSON. |
 
-The seeded gap query is already in `searches.json` with a zero baseline result count. Do not Analyze it before the Vocabulary Gaps and Recommendations steps; Analyze records the recovered candidate count. The gap screen retains its source zero-result history, but the recommendation list is based on current search result counts.
+The app keeps the strict baseline `resultCount` separate from the normalized `candidateCount`. A new search with zero strict lexical results can therefore be recorded, recovered against the catalog, and shown as a vocabulary gap when a candidate clears the review threshold and a query term is missing from its metadata. The baseline seed query works the same way, while its search count persists in localStorage.
 
 ### Demo closing line
 

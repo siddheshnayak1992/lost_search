@@ -20,7 +20,8 @@ import initialSearches from "./data/searches.json";
 import vocabulary from "./data/controlledVocabulary.json";
 import {
   collectVocabularyGaps, createRecommendations, groupQueries, mergeSearches,
-  normalizeQuery, rankProducts, recordSearch, SCORE_WEIGHTS, simulateFix
+  normalizeQuery, rankProducts, recordSearch, SCORE_WEIGHTS, simulateFix,
+  strictLexicalResultCount
 } from "./utils/searchIntelligence.js";
 
 const drawerWidth = 238;
@@ -47,7 +48,12 @@ const titles = {
 function readSearches() {
   try {
     const stored = JSON.parse(localStorage.getItem("footwear-searches-v1"));
-    return Array.isArray(stored) ? mergeSearches(initialSearches, stored) : initialSearches;
+    if (!Array.isArray(stored)) return initialSearches;
+    const merged = mergeSearches(initialSearches, stored);
+    const sourceQueries = new Set(initialSearches.map((search) => search.query.toLowerCase().trim().replace(/\s+/g, " ")));
+    return merged.map((search) => sourceQueries.has(search.query.toLowerCase().trim().replace(/\s+/g, " "))
+      ? search
+      : { ...search, resultCount: strictLexicalResultCount(search.query, products) });
   } catch {
     return initialSearches;
   }
@@ -73,7 +79,7 @@ function ScoreBar({ value }) {
   return <Box className="score-cell"><LinearProgress variant="determinate" value={value} /><Typography>{value}</Typography></Box>;
 }
 
-function Overview({ searches, groups, recommendations, onNavigate }) {
+function Overview({ searches, groups, recommendations, onNavigate, onRunDemo }) {
   const total = searches.reduce((sum, item) => sum + item.searchCount, 0);
   const zeroes = searches.filter((item) => item.resultCount === 0);
   const zeroVolume = zeroes.reduce((sum, item) => sum + item.searchCount, 0);
@@ -102,7 +108,7 @@ function Overview({ searches, groups, recommendations, onNavigate }) {
         <Button className="text-action" onClick={() => onNavigate("product-matches")}>Inspect product matches <span aria-hidden="true">↗</span></Button>
       </Paper>
     </div>
-    <Box className="catalog-ribbon"><Box><Typography className="eyebrow">Synthetic footwear catalog</Typography><Typography>{products.length} products · {searches.length} query phrases · local browser storage</Typography></Box><Button onClick={() => onNavigate("recommendations")}>Open recommendations</Button></Box>
+    <Box className="catalog-ribbon"><Box><Typography className="eyebrow">Synthetic footwear catalog</Typography><Typography>{products.length} products · {searches.length} query phrases · local browser storage</Typography></Box><Box className="ribbon-actions"><Button variant="outlined" onClick={onRunDemo}>Run live gap example</Button><Button onClick={() => onNavigate("recommendations")}>Open recommendations</Button></Box></Box>
   </>;
 }
 
@@ -197,14 +203,16 @@ export default function App() {
   const recommendations = useMemo(() => createRecommendations(searches, products, vocabulary), [searches]);
   const results = useMemo(() => activeQuery ? rankProducts(activeQuery, products, vocabulary) : [], [activeQuery]);
 
-  function analyzeQuery() {
-    const original = query.trim().replace(/\s+/g, " ");
+  function analyzeQuery(queryToAnalyze = query) {
+    const original = queryToAnalyze.trim().replace(/\s+/g, " ");
     if (!original) return;
+    setQuery(original);
     const ranked = rankProducts(original, products, vocabulary).filter((item) => item.score >= 12);
-    const resultCount = ranked.length;
-    setSearches((current) => recordSearch(current, original, resultCount));
+    const candidateCount = ranked.length;
+    const baselineResultCount = strictLexicalResultCount(original, products);
+    setSearches((current) => recordSearch(current, original, candidateCount, baselineResultCount));
     setActiveQuery(original);
-    setNotice(resultCount ? `Found ${resultCount} catalog matches for “${original}”.` : `No catalog matches for “${original}”. It was added to zero-result searches.`);
+    setNotice(candidateCount ? `Found ${candidateCount} catalog matches for “${original}”.` : `No catalog matches for “${original}”. It was added to zero-result searches.`);
     setPage("product-matches");
   }
 
@@ -216,7 +224,7 @@ export default function App() {
 
   const title = titles[page];
   const content = {
-    overview: <Overview searches={searches} groups={groups} recommendations={recommendations} onNavigate={setPage} />,
+    overview: <Overview searches={searches} groups={groups} recommendations={recommendations} onNavigate={setPage} onRunDemo={() => analyzeQuery("blue party footwear")} />,
     "zero-results": <ZeroResults searches={searches} onSelect={chooseQuery} />,
     "query-groups": <QueryGroups groups={groups} />,
     "product-matches": <ProductMatches query={query} setQuery={setQuery} results={results} onSubmit={analyzeQuery} />,

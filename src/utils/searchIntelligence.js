@@ -126,6 +126,17 @@ export function rankProducts(query, products, vocabulary) {
     .sort((left, right) => right.score - left.score || left.product.title.localeCompare(right.product.title));
 }
 
+export function strictLexicalResultCount(query, products) {
+  const queryTerms = String(query ?? "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/)
+    .filter((term) => term && !STOP_WORDS.has(term));
+  if (!queryTerms.length) return 0;
+  return products.filter((product) => {
+    const productTerms = new Set(`${product.title} ${product.brand} ${product.category} ${product.color} ${product.description}`
+      .toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/));
+    return queryTerms.every((term) => productTerms.has(term));
+  }).length;
+}
+
 export function rankLexically(query, products) {
   const queryTerms = String(query ?? "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean);
   if (!queryTerms.length) return [];
@@ -153,12 +164,20 @@ export function rankLexically(query, products) {
     .sort((left, right) => right.score - left.score || left.product.title.localeCompare(right.product.title));
 }
 
-export function recordSearch(searches, query, resultCount) {
+export function recordSearch(searches, query, candidateCount, baselineResultCount = candidateCount) {
   const original = String(query ?? "").trim().replace(/\s+/g, " ");
   const key = original.toLowerCase();
   const existing = searches.find((item) => item.query.toLowerCase().trim().replace(/\s+/g, " ") === key);
-  if (existing) return searches.map((item) => item === existing ? { ...item, searchCount: item.searchCount + 1, resultCount } : item);
-  return [{ id: `SQ-${Date.now()}`, query: original, searchCount: 1, resultCount }, ...searches];
+  if (existing) return searches.map((item) => item === existing
+    ? { ...item, searchCount: item.searchCount + 1, candidateCount }
+    : item);
+  return [{
+    id: `SQ-${Date.now()}`,
+    query: original,
+    searchCount: 1,
+    resultCount: baselineResultCount,
+    candidateCount
+  }, ...searches];
 }
 
 export function mergeSearches(sourceSearches, storedSearches) {
@@ -172,7 +191,7 @@ export function mergeSearches(sourceSearches, storedSearches) {
     const stored = storedById.get(source.id) ?? storedByQuery.get(normalizeKey(source.query));
     if (!stored) return source;
     includedStoredIds.add(stored.id);
-    return { ...source, ...stored, id: source.id };
+    return { ...source, ...stored, id: source.id, resultCount: source.resultCount };
   });
   const localSearches = storedSearches.filter((search) =>
     !sourceIds.has(search.id) && !sourceQueries.has(normalizeKey(search.query)) && !includedStoredIds.has(search.id)

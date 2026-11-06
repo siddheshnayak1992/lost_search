@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import vocabulary from "../data/controlledVocabulary.json";
 import products from "../data/products.json";
 import searches from "../data/searches.json";
-import { collectVocabularyGaps, createRecommendations, detectVocabularyGaps, groupQueries, levenshteinDistance, mergeSearches, normalizeQuery, rankProducts, recordSearch, simulateFix, weightedJaccard } from "./searchIntelligence.js";
+import { collectVocabularyGaps, createRecommendations, detectVocabularyGaps, groupQueries, levenshteinDistance, mergeSearches, normalizeQuery, rankProducts, recordSearch, simulateFix, strictLexicalResultCount, weightedJaccard } from "./searchIntelligence.js";
 
 describe("search intelligence utilities", () => {
   it("normalizes controlled aliases and corrects spelling using edit distance", () => {
@@ -22,10 +22,11 @@ describe("search intelligence utilities", () => {
 
   it("increments the count for a repeated normalized search", () => {
     const existing = [{ id: "SQ1", query: "blue running shoes", searchCount: 3, resultCount: 0 }];
-    const updated = recordSearch(existing, " BLUE   RUNNING shoes ", 2);
+    const updated = recordSearch(existing, " BLUE   RUNNING shoes ", 2, 0);
     expect(updated).toHaveLength(1);
     expect(updated[0].searchCount).toBe(4);
-    expect(updated[0].resultCount).toBe(2);
+    expect(updated[0].resultCount).toBe(0);
+    expect(updated[0].candidateCount).toBe(2);
   });
 
   it("merges new source searches with persisted counts and local queries", () => {
@@ -41,6 +42,7 @@ describe("search intelligence utilities", () => {
     );
     expect(merged).toHaveLength(3);
     expect(merged.find((item) => item.id === "SQ1").searchCount).toBe(7);
+    expect(merged.find((item) => item.id === "SQ1").resultCount).toBe(0);
     expect(merged.find((item) => item.id === "SQ2")).toBeTruthy();
     expect(merged.find((item) => item.id === "local-1")).toBeTruthy();
   });
@@ -78,10 +80,24 @@ describe("search intelligence utilities", () => {
   });
 
   it("keeps source zero-result gaps visible after recording recovered candidates", () => {
-    const analyzed = recordSearch(searches, "red party footwear", 2);
+    const analyzed = recordSearch(searches, "red party footwear", 2, 0);
     const gaps = collectVocabularyGaps(analyzed, products, vocabulary, searches);
-    expect(analyzed.find((item) => item.query === "red party footwear").resultCount).toBe(2);
+    expect(analyzed.find((item) => item.query === "red party footwear").resultCount).toBe(0);
+    expect(analyzed.find((item) => item.query === "red party footwear").candidateCount).toBe(2);
     expect(gaps.some((gap) => gap.query === "red party footwear" && gap.term === "red")).toBe(true);
+  });
+
+  it("creates a vocabulary gap dynamically for a new zero-baseline search", () => {
+    const query = "blue party footwear";
+    const baselineResultCount = strictLexicalResultCount(query, products);
+    const candidateCount = rankProducts(query, products, vocabulary).filter((item) => item.score >= 12).length;
+    const recorded = recordSearch([], query, candidateCount, baselineResultCount);
+    const gaps = collectVocabularyGaps(recorded, products, vocabulary);
+
+    expect(baselineResultCount).toBe(0);
+    expect(candidateCount).toBeGreaterThan(0);
+    expect(gaps[0].term).toBe("blue");
+    expect(gaps[0].product.title).toBe("Bacca Bucci Light-Up Party Sneaker");
   });
 
   it("generates an assortment review when no catalog term matches", () => {

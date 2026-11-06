@@ -67,6 +67,7 @@ kbd { border: 1px solid #d9ded8; border-radius: 2px; padding: 1px 5px; color: #6
 .weight-list b { color: #203d34; }
 .text-action { padding-left: 0 !important; color: #286552 !important; font-size: 11px !important; }
 .catalog-ribbon { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding: 15px 20px; background: #e8dfd1; border-radius: 3px; }
+.ribbon-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .catalog-ribbon .eyebrow { margin-bottom: 4px !important; color: #776c5d !important; }
 .catalog-ribbon p:not(.eyebrow) { font: 15px Georgia, serif; color: #3b423a; }
 .catalog-ribbon button { color: #315e4d; font-size: 11px; }
@@ -165,6 +166,7 @@ kbd { border: 1px solid #d9ded8; border-radius: 2px; padding: 1px 5px; color: #6
   .overview-grid { grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
   .demand-panel, .insight-panel { padding: 17px; }
   .catalog-ribbon { align-items: start; flex-direction: column; gap: 8px; padding: 14px 16px; }
+  .ribbon-actions { justify-content: flex-start; }
   .catalog-ribbon p:not(.eyebrow) { font-size: 13px; }
   .page-footer { font-size: 7px; }
   .page-footer span:last-child { text-align: right; }
