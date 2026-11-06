@@ -405,7 +405,9 @@ Recommendations are review suggestions. The application does not automatically m
 
 **Solution:**
 
-Show a temporary before-and-after simulation.
+**Page:** Fix Simulator.
+
+The simulator appends the entered term to the original query and reruns strict lexical matching. It is a temporary query expansion, not a saved synonym rule.
 
 ```text
 Before
@@ -417,6 +419,7 @@ party
 
 After simulation
 Rewritten query: glow footwear party
+Lexical candidates: 1
 Candidate: Bacca Bucci Light-Up Party Sneaker
 ```
 
