@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import vocabulary from "../data/controlledVocabulary.json";
 import products from "../data/products.json";
-import { createRecommendations, detectVocabularyGaps, groupQueries, levenshteinDistance, normalizeQuery, rankProducts, recordSearch, simulateFix, weightedJaccard } from "./searchIntelligence.js";
+import searches from "../data/searches.json";
+import { collectVocabularyGaps, createRecommendations, detectVocabularyGaps, groupQueries, levenshteinDistance, mergeSearches, normalizeQuery, rankProducts, recordSearch, simulateFix, weightedJaccard } from "./searchIntelligence.js";
 
 describe("search intelligence utilities", () => {
   it("normalizes controlled aliases and corrects spelling using edit distance", () => {
@@ -27,6 +28,23 @@ describe("search intelligence utilities", () => {
     expect(updated[0].resultCount).toBe(2);
   });
 
+  it("merges new source searches with persisted counts and local queries", () => {
+    const merged = mergeSearches(
+      [
+        { id: "SQ1", query: "existing query", searchCount: 3, resultCount: 0 },
+        { id: "SQ2", query: "new source query", searchCount: 2, resultCount: 0 }
+      ],
+      [
+        { id: "SQ1", query: "existing query", searchCount: 7, resultCount: 1 },
+        { id: "local-1", query: "browser-only query", searchCount: 1, resultCount: 0 }
+      ]
+    );
+    expect(merged).toHaveLength(3);
+    expect(merged.find((item) => item.id === "SQ1").searchCount).toBe(7);
+    expect(merged.find((item) => item.id === "SQ2")).toBeTruthy();
+    expect(merged.find((item) => item.id === "local-1")).toBeTruthy();
+  });
+
   it("uses weighted Jaccard query overlap and sums grouped volume", () => {
     expect(weightedJaccard(["running", "shoe"], ["running", "trail"])).toBeCloseTo(1 / 3);
     const group = groupQueries([
@@ -48,6 +66,22 @@ describe("search intelligence utilities", () => {
     const recovered = rankProducts("red party footwear", products, vocabulary);
     expect(detectVocabularyGaps("red party footwear", recovered, vocabulary)[0].term).toBe("red");
     expect(detectVocabularyGaps("red party footwear", [], vocabulary)).toEqual([]);
+  });
+
+  it("includes a current zero-result example that surfaces in Vocabulary Gaps", () => {
+    const search = searches.find((item) => item.query === "red party footwear");
+    const recovered = rankProducts(search.query, products, vocabulary);
+    const gaps = detectVocabularyGaps(search.query, recovered, vocabulary);
+    expect(search.resultCount).toBe(0);
+    expect(gaps[0].product.title).toBe("Bacca Bucci Light-Up Party Sneaker");
+    expect(gaps[0].term).toBe("red");
+  });
+
+  it("keeps source zero-result gaps visible after recording recovered candidates", () => {
+    const analyzed = recordSearch(searches, "red party footwear", 2);
+    const gaps = collectVocabularyGaps(analyzed, products, vocabulary, searches);
+    expect(analyzed.find((item) => item.query === "red party footwear").resultCount).toBe(2);
+    expect(gaps.some((gap) => gap.query === "red party footwear" && gap.term === "red")).toBe(true);
   });
 
   it("generates an assortment review when no catalog term matches", () => {

@@ -19,8 +19,8 @@ import products from "./data/products.json";
 import initialSearches from "./data/searches.json";
 import vocabulary from "./data/controlledVocabulary.json";
 import {
-  createRecommendations, detectVocabularyGaps, groupQueries, normalizeQuery,
-  rankProducts, recordSearch, SCORE_WEIGHTS, simulateFix
+  collectVocabularyGaps, createRecommendations, groupQueries, mergeSearches,
+  normalizeQuery, rankProducts, recordSearch, SCORE_WEIGHTS, simulateFix
 } from "./utils/searchIntelligence.js";
 
 const drawerWidth = 238;
@@ -47,7 +47,7 @@ const titles = {
 function readSearches() {
   try {
     const stored = JSON.parse(localStorage.getItem("footwear-searches-v1"));
-    return Array.isArray(stored) ? stored : initialSearches;
+    return Array.isArray(stored) ? mergeSearches(initialSearches, stored) : initialSearches;
   } catch {
     return initialSearches;
   }
@@ -144,11 +144,8 @@ function ProductMatches({ query, setQuery, results, onSubmit }) {
   </>;
 }
 
-function VocabularyGaps({ searches }) {
-  const gaps = searches.filter((search) => search.resultCount === 0).flatMap((search) => {
-    const ranked = rankProducts(search.query, products, vocabulary);
-    return detectVocabularyGaps(search.query, ranked, vocabulary).map((gap) => ({ ...gap, query: search.query, searchCount: search.searchCount }));
-  }).sort((a, b) => b.searchCount - a.searchCount);
+function VocabularyGaps({ searches, sourceSearches }) {
+  const gaps = collectVocabularyGaps(searches, products, vocabulary, sourceSearches);
   return <Paper className="content-panel table-panel" elevation={0}>
     <SectionHeading title={`${gaps.length} candidate gaps`} detail="A rule-based comparison of query terms and recovered product metadata." />
     {gaps.length ? <Table size="small"><TableHead><TableRow><TableCell>Query</TableCell><TableCell>Unrepresented term</TableCell><TableCell>Candidate product</TableCell><TableCell>Searches</TableCell><TableCell>Weighted score</TableCell></TableRow></TableHead><TableBody>{gaps.map((gap, index) => <TableRow key={`${gap.query}-${gap.term}-${index}`}><TableCell>{gap.query}</TableCell><TableCell><Chip size="small" label={gap.term} className="term-chip" /></TableCell><TableCell>{gap.product.title}</TableCell><TableCell>{gap.searchCount}</TableCell><TableCell>{gap.score}</TableCell></TableRow>)}</TableBody></Table> : <EmptyState>No zero-result query currently has both a plausible catalog candidate and an unsupported term.</EmptyState>}
@@ -223,7 +220,7 @@ export default function App() {
     "zero-results": <ZeroResults searches={searches} onSelect={chooseQuery} />,
     "query-groups": <QueryGroups groups={groups} />,
     "product-matches": <ProductMatches query={query} setQuery={setQuery} results={results} onSubmit={analyzeQuery} />,
-    "vocabulary-gaps": <VocabularyGaps searches={searches} />,
+    "vocabulary-gaps": <VocabularyGaps searches={searches} sourceSearches={initialSearches} />,
     recommendations: <Recommendations recommendations={recommendations} />,
     "fix-simulator": <FixSimulator query={query} setQuery={setQuery} mapping={mapping} setMapping={setMapping} result={simulation} onSimulate={() => setSimulation(simulateFix(query, mapping, products, vocabulary))} />
   }[page];

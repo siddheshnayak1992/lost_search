@@ -161,6 +161,25 @@ export function recordSearch(searches, query, resultCount) {
   return [{ id: `SQ-${Date.now()}`, query: original, searchCount: 1, resultCount }, ...searches];
 }
 
+export function mergeSearches(sourceSearches, storedSearches) {
+  const normalizeKey = (query) => query.toLowerCase().trim().replace(/\s+/g, " ");
+  const storedById = new Map(storedSearches.map((search) => [search.id, search]));
+  const storedByQuery = new Map(storedSearches.map((search) => [normalizeKey(search.query), search]));
+  const includedStoredIds = new Set();
+  const sourceIds = new Set(sourceSearches.map((search) => search.id));
+  const sourceQueries = new Set(sourceSearches.map((search) => normalizeKey(search.query)));
+  const mergedSource = sourceSearches.map((source) => {
+    const stored = storedById.get(source.id) ?? storedByQuery.get(normalizeKey(source.query));
+    if (!stored) return source;
+    includedStoredIds.add(stored.id);
+    return { ...source, ...stored, id: source.id };
+  });
+  const localSearches = storedSearches.filter((search) =>
+    !sourceIds.has(search.id) && !sourceQueries.has(normalizeKey(search.query)) && !includedStoredIds.has(search.id)
+  );
+  return [...mergedSource, ...localSearches];
+}
+
 function termWeights(searches, vocabulary) {
   const documents = searches.map((search) => new Set(normalizeQuery(search.query, vocabulary).tokens));
   const frequencies = new Map();
@@ -222,8 +241,25 @@ export function detectVocabularyGaps(query, rankedProducts, vocabulary, minimumS
     vocabulary
   ).tokens);
   return normalized.tokens
-    .filter((term) => !productTerms.has(term) && !(vocabulary.terms?.[term]?.aliases ?? []).length)
+    .filter((term) => !productTerms.has(term))
     .map((term) => ({ term, product: best.product, score: best.score, explanation: "Query term is not represented in the matched product metadata." }));
+}
+
+export function collectVocabularyGaps(searches, products, vocabulary, sourceSearches = []) {
+  const queryKey = (query) => query.toLowerCase().trim().replace(/\s+/g, " ");
+  const sourceZeroQueries = new Set(sourceSearches
+    .filter((search) => search.resultCount === 0)
+    .map((search) => queryKey(search.query)));
+  return searches.filter((search) => search.resultCount === 0 || sourceZeroQueries.has(queryKey(search.query)))
+    .flatMap((search) => {
+      const ranked = rankProducts(search.query, products, vocabulary);
+      return detectVocabularyGaps(search.query, ranked, vocabulary).map((gap) => ({
+        ...gap,
+        query: search.query,
+        searchCount: search.searchCount
+      }));
+    })
+    .sort((left, right) => right.searchCount - left.searchCount);
 }
 
 export function createRecommendations(searches, products, vocabulary) {

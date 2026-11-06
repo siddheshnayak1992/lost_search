@@ -15,7 +15,7 @@ For example, the catalog may contain a product described as:
 ```text
 Puma Comfort Walk
 Walking Shoes
-comfortable, soft, cushioned
+Cushioned walking shoes with a flexible sole for all-day comfort.
 ```
 
 A customer may search for:
@@ -66,25 +66,22 @@ The application analyzes failed searches, understands customer vocabulary and sp
 ## End-to-end flow
 
 ```text
-Customer search
+Aggregated customer search record
       |
       v
-Baseline lexical search
+Baseline result count
       |
-      +---- results found ----> Show normal results
+        +---- results found ----> Existing search results
       |
       +---- zero results
               |
               v
-      Vocabulary normalization
+      Controlled vocabulary normalization
               +
-      Dynamic spelling analysis
+      Levenshtein spelling correction
               |
               v
-      Interpreted customer intent
-              |
-              v
-      Explainable product scoring
+      Explainable product ranking
               |
         +-----+------------------+
         |                        |
@@ -122,14 +119,7 @@ Contains the synthetic footwear catalog.
   "category": "Walking Shoes",
   "color": "Black",
   "price": 3499,
-  "description": "Soft comfortable cushioned walking shoes designed for all-day use.",
-  "attributes": [
-    "comfortable",
-    "soft",
-    "cushioned",
-    "walking",
-    "lightweight"
-  ]
+        "description": "Cushioned walking shoes with a flexible sole for all-day comfort."
 }
 ```
 
@@ -143,7 +133,7 @@ Contains aggregated synthetic search activity.
 {
   "id": "SQ001",
   "query": "comfy footwear",
-  "searchCount": 2,
+        "searchCount": 28,
   "resultCount": 0
 }
 ```
@@ -152,24 +142,21 @@ Purpose: shows what customers searched for, how often the search occurred, and w
 
 `searchCount` represents search events, not unique customers. No customer identity is stored.
 
-### 3. `vocabulary.json`
+### 3. `controlledVocabulary.json`
 
-Contains a small, controlled footwear vocabulary that connects customer terminology with catalog terminology.
+Contains canonical terms and curated single- or multiword aliases for query normalization.
 
 ```json
 {
-  "customerTerm": "comfy",
-  "catalogTerms": [
-    "comfortable",
-    "soft",
-    "cushioned"
-  ],
-  "type": "colloquial",
-  "explanation": "Customers may use comfy when the catalog describes comfort as comfortable, soft, or cushioned."
+        "terms": {
+                "comfortable": { "aliases": ["comfy", "comfort", "comfortably"] },
+                "waterproof": { "aliases": ["water proof", "water-resistant", "water resistant"] },
+                "adidas": { "aliases": ["adiddas", "addidas"] }
+        }
 }
 ```
 
-Purpose: makes vocabulary interpretation transparent, editable, category-specific, and explainable.
+An alias resolves to one canonical term. Related terms such as `soft` and `cushioned` are separate terms, not automatic synonyms.
 
 ---
 
@@ -193,8 +180,8 @@ The solution is divided into seven modules so each team member can own and expla
 
 ```text
 comfy footwear
-Before: 2 searches
-After another search: 3 searches
+Before: 28 searches
+After another search: 29 searches
 Baseline results: 0
 ```
 
@@ -218,20 +205,20 @@ Baseline results: 0
 
 **Solution:**
 
-Use the controlled vocabulary to interpret customer language.
+Use the controlled vocabulary to normalize customer language to canonical terms.
 
 ```text
-comfy     -> comfortable, soft, cushioned
+comfy     -> comfortable
 footwear  -> shoes
-work      -> office, formal
-trainers  -> sneakers, running shoes
+water proof -> waterproof
+light up    -> light-up
 ```
 
-A one-to-many mapping is preserved during scoring. For example, `comfy` is not prematurely reduced to only `comfortable`; products described as `soft` or `cushioned` can also satisfy the concept.
+Each alias maps to one canonical term. Products still receive independent matches for terms present in their title, brand, category, color, or description.
 
 **Suggested owner responsibilities:**
 
-- `vocabulary.json`
+- `controlledVocabulary.json`
 - text normalization
 - multiword mapping such as `water proof -> waterproof`
 - canonical customer concepts
@@ -262,7 +249,7 @@ Use Levenshtein distance to measure how many character edits are needed to trans
 normalized similarity = 1 - distance / maximum word length
 ```
 
-Candidate words are derived dynamically from product brands, categories, attributes, and the controlled catalog vocabulary.
+Spelling candidates are compared against canonical terms in `controlledVocabulary.json` using normalized Levenshtein similarity. Product fields are not dynamically added to the spelling dictionary.
 
 This is different from vocabulary mapping:
 
@@ -291,35 +278,20 @@ adiddas -> adidas      Spelling difference
 
 **Solution:**
 
-Score every product using weighted catalog evidence, such as:
-
-- brand match;
-- product type or category match;
-- attribute match;
-- color match;
-- use-case or occasion match;
-- spelling-corrected match.
+Score every product by weighted coverage of normalized query terms in title, brand, category, color, and description. The weights are title 35%, brand 20%, category 20%, color 10%, and description 15%. Each result exposes matched terms and field contributions.
 
 Example:
 
 ```text
-Query: comfy footwear
-
-Interpreted concepts:
-- comfortable / soft / cushioned
-- shoes
-
-Product: Puma Comfort Walk
-Evidence:
-- footwear -> shoes
-- comfy -> comfortable
-- cushioned attribute found
-- walking-shoes category found
-
-Explainable match score: 84%
+Query: red party footwear
+Baseline result count: 0
+Candidate: Bacca Bucci Light-Up Party Sneaker
+Matched term: party
+Unrepresented term: red
+Weighted score: 35/100
 ```
 
-The displayed score is produced by the application's weighted matching algorithm. It is not AI confidence or probability.
+The score is weighted field coverage, not a probability, confidence, or promise that the customer query will convert.
 
 **Suggested owner responsibilities:**
 
@@ -341,32 +313,21 @@ The displayed score is produced by the application's weighted matching algorithm
 
 **Solution:**
 
-1. Normalize vocabulary and spelling.
-2. Convert each query into canonical concepts.
-3. Compare concept sets using weighted Jaccard similarity.
-4. Prevent weak grouping based only on generic words such as `shoes`.
-5. Group sufficiently similar queries.
-6. Sum member `searchCount` values.
+1. Normalize each complete query to canonical terms.
+2. Weight terms by inverse document frequency across the search set.
+3. Compare term sets using weighted Jaccard similarity.
+4. Greedily group queries that meet the configured similarity threshold.
+5. Use the highest-volume member as representative and sum member `searchCount` values.
 
 Example:
 
 ```text
-comfy footwear       -> comfort + shoes
+comfy footwear       -> comfortable + shoes
 cushoned footwear    -> cushioned + shoes
 comfortable shoes    -> comfortable + shoes
 ```
 
-Possible group:
-
-```text
-Comfortable Footwear
-
-comfy footwear       100 searches
-comfortable shoes     70 searches
-cushoned footwear     40 searches
-                      ------------
-Total demand          210 searches
-```
+The app calculates group membership, representative query, and total volume from the current search data; these example phrases do not imply fixed group totals.
 
 **Suggested owner responsibilities:**
 
@@ -393,10 +354,10 @@ Classify the reason and create an evidence-based recommendation.
 #### Vocabulary gap
 
 ```text
-Customer says: comfy
-Catalog says: comfortable
-Relevant products exist
-Recommendation: review adding a search synonym
+Zero-result query: red party footwear
+Recovered candidate: Bacca Bucci Light-Up Party Sneaker
+Unrepresented query term: red
+Recommendation: review whether “red” belongs in the candidate product's metadata.
 ```
 
 #### Spelling issue
@@ -417,12 +378,12 @@ Recommendation: enrich product metadata
 #### Assortment gap
 
 ```text
-Customers search: light up party sneakers
-No relevant product is available
+Customers search: glow footwear
+No sufficiently relevant product is found
 Recommendation: merchandising review
 ```
 
-Recommendations remain `review_required`. The application does not automatically modify catalog or production search configuration.
+Recommendations are review suggestions. The application does not automatically modify catalog or production search configuration.
 
 **Suggested owner responsibilities:**
 
@@ -448,18 +409,18 @@ Show a temporary before-and-after simulation.
 
 ```text
 Before
-Query: comfy footwear
-Baseline results: 0
+Query: glow footwear
+Lexical candidates: 0
 
-Proposed mapping
-comfy -> comfortable
-footwear -> shoes
+Temporary added term
+party
 
 After simulation
-Recovered results: 5
+Rewritten query: glow footwear party
+Candidate: Bacca Bucci Light-Up Party Sneaker
 ```
 
-The simulator uses temporary state only. It does not change `products.json`, `searches.json`, `vocabulary.json`, or any production search configuration.
+The simulator uses temporary state only. It does not change `products.json`, `searches.json`, `controlledVocabulary.json`, or any production search configuration.
 
 **Suggested owner responsibilities:**
 
@@ -483,11 +444,10 @@ The simulator uses temporary state only. It does not change `products.json`, `se
 | React | Component-based browser application and interactive state management |
 | Vite | Fast local development and optimized production build |
 | JavaScript | Search normalization, fuzzy matching, scoring, grouping, and recommendation logic |
-| Material UI | Dashboard components, responsive layout, accessibility foundations, theming, tables, dialogs, chips, and forms |
+| Material UI | Dashboard components, responsive layout, accessibility foundations, theming, tables, chips, alerts, and forms |
 | JSON | Synthetic products, searches, and controlled vocabulary |
 | localStorage | Persists demo search-count changes without a backend |
 | Vitest | Deterministic unit tests for search and recommendation logic |
-| Testing Library | Tests user-visible React behavior |
 
 ---
 
@@ -499,10 +459,8 @@ The application needs:
 
 - responsive navigation drawer;
 - metric cards;
-- sortable tables;
-- filters;
+- compact data tables;
 - chips and status indicators;
-- dialogs;
 - forms;
 - tooltips;
 - alerts;
@@ -551,7 +509,7 @@ What products exist?
 searches.json
 What are customers searching for?
 
-vocabulary.json
+controlledVocabulary.json
 How does customer language differ from catalog language?
 ```
 
@@ -571,11 +529,11 @@ All other outputs are derived dynamically:
 
 ### Overview
 
-High-level metrics covering total search events, zero-result demand, recoverable demand, query groups, vocabulary gaps, spelling issues, and assortment gaps.
+High-level metrics covering total search events, zero-result volume, related query groups, and generated recommendations.
 
 ### Zero Results
 
-A sortable and filterable list of failed searches with search volume, classification, matching score, and reason.
+A list of failed searches with search volume, result count, and normalized query. Select a row to inspect product matches.
 
 ### Query Groups
 
@@ -587,7 +545,7 @@ Potential products for failed searches with explainable scores and matched evide
 
 ### Vocabulary Gaps
 
-Customer terminology that prevented discovery even though relevant catalog products existed.
+Unrepresented query terms for historically zero-result searches when a recovered catalog candidate clears the review score threshold. The source zero-result history keeps the gap visible after a user analyzes the query.
 
 ### Recommendations
 
@@ -611,7 +569,7 @@ Potential products exist, but the score is not strong enough for a direct recomm
 
 ### Vocabulary gap
 
-A controlled terminology mapping was required to recover relevant existing products.
+A historically zero-result query has a relevant candidate, but one or more normalized query terms are absent from that product's metadata. The row is a review suggestion, not proof of a synonym.
 
 ### Spelling issue
 
@@ -627,61 +585,30 @@ Customer demand exists, but no sufficiently relevant product is available in the
 
 ---
 
-## Recommended demo story
+## Reset and Repeat the Module Demo
 
-Use one query to explain the complete solution rather than navigating through many unrelated examples.
+Run the app with `npm run dev`, open the Vite URL, and reset only this app's saved search state before each full demo. In the browser DevTools Console, run:
 
-### 1. Start with the problem
-
-```text
-Query: comfy footwear
-Search count: 100
-Baseline results: 0
+```js
+localStorage.removeItem("footwear-searches-v1");
+location.reload();
 ```
 
-### 2. Explain the vocabulary difference
+Use the console for the same origin as the app (`localhost` and `127.0.0.1` have separate storage). This removes only aggregated demo searches. It does not change the three JSON source files. Alternatively, in DevTools Application storage, delete only the `footwear-searches-v1` entry. Avoid `localStorage.clear()` if other local app data may be present.
 
-```text
-comfy -> comfortable / soft / cushioned
-footwear -> shoes
-```
+Run the examples in order. Select seeded rows from Zero Results for Modules 2-4; selecting a row opens Product Matches without changing its saved count or baseline result count.
 
-### 3. Show recovered products
+| Module | Example action | Affected page(s) and expected result |
+|---|---|---|
+| 1. Search data | Enter `glow footwear` in the top search and click Analyze twice. | Product Matches reports no catalog matches. Overview, Zero Results, Query Groups, and Recommendations update; one `glow footwear` entry has a search count of 2. |
+| 2. Vocabulary | Open Zero Results and select `water proof hiking shoe`. | Zero Results shows normalized query `waterproof hiking shoes`; Product Matches shows hiking candidates. The row selection does not increment its count. |
+| 3. Spelling | Open Zero Results and select `adiddas running shoes`. | Product Matches shows the Adidas candidate and a spelling-correction chip. Zero Results displays the canonicalized query. |
+| 4. Product scoring | Keep `adiddas running shoes` selected on Product Matches. | Product Matches ranks products with weighted score and field-level matched-term evidence; Adidas Runfalcon 3 is the top candidate in the seeded catalog. |
+| 5. Query grouping | Open Query Groups and find the Adidas running-shoe group. | `adiddas running shoes` and `adidas running shoes` normalize to the same terms. The representative is `adidas running shoes`; those two source phrases contribute 59 searches to the group total. |
+| 6. Gaps and recommendations | Open Vocabulary Gaps, then Recommendations. | Vocabulary Gaps shows `red party footwear` → missing term `red` → Bacca Bucci Light-Up Party Sneaker (score 35). Recommendations includes a metadata-review suggestion for that term. |
+| 7. Fix Simulator | Set Original query to `glow footwear`, Add this term to `party`, then run the simulation. | Fix Simulator shows zero lexical candidates before the expansion and the party sneaker among candidates after it. The simulation does not modify saved searches or source JSON. |
 
-```text
-Puma Comfort Walk
-Explainable match score: 84%
-
-Evidence:
-- comfortable attribute
-- cushioned attribute
-- shoes category
-```
-
-### 4. Show grouped demand
-
-```text
-Comfortable Footwear
-
-comfy footwear       100
-comfortable shoes     70
-cushoned footwear     40
-Total demand          210
-```
-
-### 5. Show the gap and recommendation
-
-```text
-Vocabulary gap: comfy -> comfortable
-Recommendation: review adding a search synonym
-```
-
-### 6. Run the Fix Simulator
-
-```text
-Before: 0 products
-After: 5 recovered products
-```
+The seeded gap query is already in `searches.json` with a zero baseline result count. Do not Analyze it before the Vocabulary Gaps and Recommendations steps; Analyze records the recovered candidate count. The gap screen retains its source zero-result history, but the recommendation list is based on current search result counts.
 
 ### Demo closing line
 
@@ -718,7 +645,7 @@ After: 5 recovered products
 
 - Synthetic products and synthetic search activity only.
 - No customer identity or personal information.
-- No tracking.
+- No customer-level tracking or analytics service.
 - No backend or database.
 - No external runtime service.
 - No automatic production catalog modification.
@@ -730,7 +657,7 @@ After: 5 recovered products
 
 ### Prerequisites
 
-- Node.js 18 or later
+- Node.js 22.12 or later (required by the current Vitest release)
 - npm
 
 ### Setup
@@ -759,28 +686,25 @@ npm run preview
 
 ## Testing strategy
 
-The core algorithms are deterministic and should be covered by unit tests:
+The core algorithms are deterministic and are covered by unit tests for:
 
-- text normalization;
-- multiword vocabulary mapping;
-- Levenshtein distance;
-- spelling thresholds;
-- repeated-query aggregation;
-- weighted product scoring;
-- recoverable/review/assortment classification;
-- weighted Jaccard grouping;
-- unrelated-query separation;
-- vocabulary-gap evidence;
-- recommendation generation;
-- Fix Simulator behavior;
-- source-data immutability.
+- single- and multiword normalization;
+- Levenshtein spelling correction;
+- explainable weighted product scoring;
+- repeated-query aggregation and merging saved searches with source data;
+- weighted Jaccard grouping and search-volume totals;
+- vocabulary gaps for recovered candidates, including the seeded `red party footwear` example;
+- generated assortment recommendations;
+- temporary Fix Simulator behavior.
+
+Tests run locally with `npm test` and do not make network requests.
 
 ---
 
 ## Limitations
 
 - The controlled vocabulary is footwear-specific.
-- Coverage depends on the quality of product attributes and vocabulary mappings.
+- Coverage depends on the quality of product metadata and curated aliases.
 - Weighted thresholds require tuning against representative synthetic examples.
 - The approach does not provide broad open-domain semantic understanding.
 - `localStorage` is suitable for a demo, not shared multi-user production persistence.
@@ -799,8 +723,8 @@ Possible production-scale enhancements:
 - search conversion and click-through analysis;
 - category-specific vocabulary packs;
 - integration with Elasticsearch, OpenSearch, Algolia, or a commerce search platform;
-- optional semantic search behind an approved internal service;
 - trend detection by day, week, or season;
+- broader curated vocabulary and spelling coverage;
 - recommendation export and audit history.
 
 ---

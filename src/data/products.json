@@ -1,5 +1,5 @@
 [
-  { "id": "SH001", "title": "Puma Comfort Walk", "brand": "Puma", "category": "Walking Shoes", "color": "Black", "price": 3499, "description": "Cushioned walking shoes with a flexible sole for all-day comfort." },
+  { "id": "SH001", "title": "Puma Comfort Walk", "brand": "Puma", "category": "Walking Shoes", "color": "Black", "price": 3499, "description": "Cushioned walking shoes with a flexible sole for all-day comfort." }, 
   { "id": "SH002", "title": "Adidas Runfalcon 3", "brand": "Adidas", "category": "Running Shoes", "color": "Blue", "price": 4999, "description": "Lightweight running shoes with a breathable mesh upper." },
   { "id": "SH003", "title": "Nike Revolution Road", "brand": "Nike", "category": "Running Shoes", "color": "White", "price": 5299, "description": "Everyday road running shoes with soft foam cushioning." },
   { "id": "SH004", "title": "Skechers Go Walk Flex", "brand": "Skechers", "category": "Walking Shoes", "color": "Grey", "price": 4599, "description": "Lightweight slip-on walking shoes with flexible cushioning." },
