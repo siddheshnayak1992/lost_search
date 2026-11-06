@@ -685,6 +685,10 @@ npm run build
 npm run preview
 ```
 
+## VS Code Custom Agent
+
+The workspace provides a selectable **Footwear Search** agent at `.github/agents/footwear-search.agent.md`. It follows the root `AGENTS.md`, preserves the synthetic-data and explainability constraints, and uses the existing tests and build. Choose it from the Chat agent picker; if it is not listed yet, reopen the picker or reload the VS Code window. `AGENTS.md` remains at the repository root so its project instructions continue to apply automatically to other agents too.
+
 ---
 
 ## Testing strategy
