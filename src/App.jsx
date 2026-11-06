@@ -12,8 +12,6 @@ import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
 import SpellcheckOutlined from "@mui/icons-material/SpellcheckOutlined";
 import TipsAndUpdatesOutlined from "@mui/icons-material/TipsAndUpdatesOutlined";
 import CompareArrowsOutlined from "@mui/icons-material/CompareArrowsOutlined";
-import DarkModeOutlined from "@mui/icons-material/DarkModeOutlined";
-import LightModeOutlined from "@mui/icons-material/LightModeOutlined";
 import AddOutlined from "@mui/icons-material/AddOutlined";
 import products from "./data/products.json";
 import initialSearches from "./data/searches.json";
@@ -137,7 +135,7 @@ function ProductMatches({ query, setQuery, results, onSubmit }) {
   return <>
     <Paper className="content-panel query-panel" elevation={0}>
       <TextField fullWidth label="Search query" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && onSubmit()} placeholder="Try “adiddas running shoes”" />
-      <Button variant="contained" onClick={onSubmit} startIcon={<SearchOutlined />}>Analyze query</Button>
+      <Button variant="contained" onClick={() => onSubmit()} startIcon={<SearchOutlined />}>Analyze query</Button>
     </Paper>
     <Paper className="content-panel table-panel" elevation={0}>
       <SectionHeading title={`${results.length} ranked products`} detail="Weighted score from 0 to 100. Scores explain overlap, not purchase likelihood." />
@@ -190,13 +188,12 @@ export default function App() {
   const [activeQuery, setActiveQuery] = useState("");
   const [mapping, setMapping] = useState("");
   const [simulation, setSimulation] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
   const [notice, setNotice] = useState("");
   const theme = useMemo(() => createTheme({
-    palette: { mode: darkMode ? "dark" : "light", primary: { main: "#286552" }, secondary: { main: "#d85b3f" }, background: { default: darkMode ? "#161c19" : "#f4f4ef", paper: darkMode ? "#202925" : "#fff" } },
+    palette: { mode: "light", primary: { main: "#286552" }, secondary: { main: "#d85b3f" }, background: { default: "#f4f4ef", paper: "#fff" } },
     typography: { fontFamily: '"Trebuchet MS", "Segoe UI", sans-serif', h2: { fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "1.7rem", fontWeight: 500 }, h3: { fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "1.3rem", fontWeight: 500 }, button: { textTransform: "none", fontWeight: 700 } },
     shape: { borderRadius: 4 }, components: { MuiButton: { styleOverrides: { root: { borderRadius: 4, minHeight: 40 } } }, MuiPaper: { styleOverrides: { root: { backgroundImage: "none" } } } }
-  }), [darkMode]);
+  }), []);
 
   useEffect(() => { localStorage.setItem("footwear-searches-v1", JSON.stringify(searches)); }, [searches]);
   const groups = useMemo(() => groupQueries(searches, vocabulary), [searches]);
@@ -245,8 +242,7 @@ export default function App() {
         <AppBar position="sticky" elevation={0} className="topbar"><Toolbar className="topbar-inner">
           <Box className="mobile-brand"><span className="brand-mark">S<span>i</span></span></Box>
           <TextField className="global-search" size="small" aria-label="Analyze a search query" placeholder="Analyze a customer search…" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && analyzeQuery()} InputProps={{ startAdornment: <InputAdornment position="start"><SearchOutlined fontSize="small" /></InputAdornment>, endAdornment: <InputAdornment position="end"><kbd>↵</kbd></InputAdornment> }} />
-          <Tooltip title={darkMode ? "Switch to light theme" : "Switch to dark theme"}><IconButton aria-label="Toggle color theme" onClick={() => setDarkMode((value) => !value)}>{darkMode ? <LightModeOutlined /> : <DarkModeOutlined />}</IconButton></Tooltip>
-          <Button className="top-search-button" variant="contained" startIcon={<AddOutlined />} onClick={analyzeQuery}>Analyze</Button>
+          <Button className="top-search-button" variant="contained" startIcon={<AddOutlined />} onClick={() => analyzeQuery()}>Analyze</Button>
         </Toolbar></AppBar>
         <Box component="main" className="page-content">
           <Box className="page-title"><Box><Typography className="eyebrow">FOOTWEAR · SEARCH QUALITY</Typography><Typography variant="h1">{title[0]}</Typography><Typography className="page-description">{title[1]}</Typography></Box><div className="page-date">LIVE DATA <span /></div></Box>

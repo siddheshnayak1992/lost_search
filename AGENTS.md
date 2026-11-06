@@ -29,7 +29,7 @@ Do not add generated embeddings or generated analysis JSON. Compute groups, rank
 - The Fix Simulator compares strict lexical results before and after a temporary query expansion. It must not change source JSON or saved search data.
 
 ## UI
-Provide responsive navigation for Overview, Zero Results, Query Groups, Product Matches, Vocabulary Gaps, Recommendations, and Fix Simulator. Preserve accessible labels, keyboard focus, light/dark theme support, and concise match explanations. Keep mobile layouts free of horizontal overflow.
+Provide responsive navigation for Overview, Zero Results, Query Groups, Product Matches, Vocabulary Gaps, Recommendations, and Fix Simulator. Preserve accessible labels, keyboard focus, the light theme, and concise match explanations. Keep mobile layouts free of horizontal overflow.
 
 ## Verification
 - Install dependencies with `npm install`.

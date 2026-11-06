@@ -426,7 +426,7 @@ The simulator uses temporary state only. It does not change `products.json`, `se
 
 - Material UI dashboard
 - navigation and responsive layout
-- light/dark themes
+- light theme
 - recommendation workflow
 - before/after simulator
 - accessibility and empty states
@@ -464,7 +464,7 @@ The application needs:
 - forms;
 - tooltips;
 - alerts;
-- light/dark themes;
+- a consistent light theme;
 - keyboard and accessibility support.
 
 Material UI provides these higher-level components and interaction patterns directly. This reduces the amount of custom UI code required during a time-boxed hackathon and helps the team keep the dashboard visually consistent.
