@@ -210,7 +210,6 @@ export default function App() {
     setSearches((current) => recordSearch(current, original, candidateCount, baselineResultCount));
     setActiveQuery(original);
     setNotice(candidateCount ? `Found ${candidateCount} catalog matches for “${original}”.` : `No catalog matches for “${original}”. It was added to zero-result searches.`);
-    setPage("product-matches");
   }
 
   function chooseQuery(value) {
